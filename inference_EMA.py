@@ -1,37 +1,23 @@
-import argparse
 import json
-import datetime as dt
 import numpy as np
-from scipy.io.wavfile import write
-import IPython.display as ipd
-import glob
 import torch
 from pydub import AudioSegment
-from torch.utils.data import DataLoader
-from text import text_to_sequence, cmudict
-from text.symbols import symbols
 import utils_data
 import re
 from num2words import num2words
-from kaldiio import WriteHelper
-import os
-from tqdm import tqdm
-from text import text_to_sequence, convert_text
+from text import convert_text
 from model import GradTTSWithEmo
 import utils_data as utils
 from attrdict import AttrDict
 from models import Generator as HiFiGAN
 
-
 HIFIGAN_CONFIG = './configs/hifigan-config.json'
-HIFIGAN_CHECKPT = './checkpts/hifigan.pt'
-
+HIFIGAN_CHECKPT = r'.\pre_trained\g_01720000'
 
 if __name__ == '__main__':
     hps, args = utils.get_hparams_decode()
     device = torch.device('cpu' if not torch.cuda.is_available() else "cuda")
-    ckpt = utils_data.latest_checkpoint_path(hps.model_dir, "EMA_grad_*.pt")
-    print(ckpt)
+    ckpt = args.model
     model = GradTTSWithEmo(**hps.model).to(device)
     logger = utils_data.get_logger(hps.model_dir, "inference.log")
     utils_data.load_checkpoint(ckpt, model, None)
@@ -74,8 +60,8 @@ if __name__ == '__main__':
             emo = torch.LongTensor([control_emo_id]).to(device)
             sid = torch.LongTensor([control_spk_id]).to(device)
             text_padded, text_len = convert_text(text)
-            y_enc, y_dec, attn = model.forward(text_padded, text_len, 
-                                        n_timesteps=args.timesteps, 
+            y_enc, y_dec, attn = model.forward(text_padded, text_len,
+                                        n_timesteps=args.timesteps,
                                         temperature=args.noise,
                                         stoc=args.stoc, spk=sid,emo=emo, length_scale=1.,
                                         classifier_free_guidance=args.guidance)
@@ -86,4 +72,12 @@ if __name__ == '__main__':
         audio = audio * 32768.0
         audio = audio.detach().cpu().numpy().astype('int16')
         audio = AudioSegment(audio.data, frame_rate=22050, sample_width=2, channels=1)
-        audio.export(f'{args.generated_path}/{emos[emo_i]}_{speakers[int(line.split("|")[2])]}.wav', format="wav")
+
+        from pathlib import Path
+
+        out_dir = Path(args.generated_path)
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        spk = speakers[int(line.split("|")[2])]
+        fname = f"{emos[emo_i]}_{spk}.wav"
+        audio.export(str(out_dir / fname), format="wav")
