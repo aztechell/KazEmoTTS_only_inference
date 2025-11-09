@@ -42,10 +42,6 @@ if __name__ == '__main__':
         replace_nums.append(i.split('|', 1))
 
     nums2word = [re.sub('(\d+)', lambda m: num2words(m.group(), lang='kz'), sentence) for sentence in np.array(replace_nums)[:, 0]]
-    # Speakers id.
-    # M1 = 0
-    # F1 = 1
-    # M2 = 2
     text2speech = []
     for i, j in zip(nums2word, np.array(replace_nums)[:, 1]):
         text2speech.append(f'{i}|{j}')
@@ -81,3 +77,5 @@ if __name__ == '__main__':
         spk = speakers[int(line.split("|")[2])]
         fname = f"{emos[emo_i]}_{spk}.wav"
         audio.export(str(out_dir / fname), format="wav")
+        del y_enc, y_dec, attn, audio
+        torch.cuda.empty_cache()
