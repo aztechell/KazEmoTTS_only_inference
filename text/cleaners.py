@@ -1,72 +1,54 @@
-""" from https://github.com/keithito/tacotron """
+"""Kazakh-specific text cleaners used during inference."""
+
+from __future__ import annotations
 
 import re
-from unidecode import unidecode
+
+__all__ = ["kazakh_cleaners"]
 
 
-_whitespace_re = re.compile(r'\s+')
+_WHITESPACE_RE = re.compile(r"\s+")
+_ABBREVIATIONS = [
+    (re.compile(r"\bmrs\.", re.IGNORECASE), "misess"),
+    (re.compile(r"\bmr\.", re.IGNORECASE), "mister"),
+    (re.compile(r"\bdr\.", re.IGNORECASE), "doctor"),
+    (re.compile(r"\bst\.", re.IGNORECASE), "saint"),
+    (re.compile(r"\bco\.", re.IGNORECASE), "company"),
+    (re.compile(r"\bjr\.", re.IGNORECASE), "junior"),
+    (re.compile(r"\bmaj\.", re.IGNORECASE), "major"),
+    (re.compile(r"\bgen\.", re.IGNORECASE), "general"),
+    (re.compile(r"\bdrs\.", re.IGNORECASE), "doctors"),
+    (re.compile(r"\brev\.", re.IGNORECASE), "reverend"),
+    (re.compile(r"\blt\.", re.IGNORECASE), "lieutenant"),
+    (re.compile(r"\bhon\.", re.IGNORECASE), "honorable"),
+    (re.compile(r"\bsgt\.", re.IGNORECASE), "sergeant"),
+    (re.compile(r"\bcapt\.", re.IGNORECASE), "captain"),
+    (re.compile(r"\besq\.", re.IGNORECASE), "esquire"),
+    (re.compile(r"\bltd\.", re.IGNORECASE), "limited"),
+    (re.compile(r"\bcol\.", re.IGNORECASE), "colonel"),
+    (re.compile(r"\bft\.", re.IGNORECASE), "fort"),
+]
 
-_abbreviations = [(re.compile('\\b%s\\.' % x[0], re.IGNORECASE), x[1]) for x in [
-    ('mrs', 'misess'),
-    ('mr', 'mister'),
-    ('dr', 'doctor'),
-    ('st', 'saint'),
-    ('co', 'company'),
-    ('jr', 'junior'),
-    ('maj', 'major'),
-    ('gen', 'general'),
-    ('drs', 'doctors'),
-    ('rev', 'reverend'),
-    ('lt', 'lieutenant'),
-    ('hon', 'honorable'),
-    ('sgt', 'sergeant'),
-    ('capt', 'captain'),
-    ('esq', 'esquire'),
-    ('ltd', 'limited'),
-    ('col', 'colonel'),
-    ('ft', 'fort'),
-]]
 
-
-def expand_abbreviations(text):
-    for regex, replacement in _abbreviations:
-        text = re.sub(regex, replacement, text)
+def _expand_abbreviations(text: str) -> str:
+    for pattern, replacement in _ABBREVIATIONS:
+        text = pattern.sub(replacement, text)
     return text
 
 
-def lowercase(text):
-    return text.lower()
+def _collapse_whitespace(text: str) -> str:
+    return _WHITESPACE_RE.sub(" ", text)
 
 
-def collapse_whitespace(text):
-    return re.sub(_whitespace_re, ' ', text)
+def _replace_english_words(text: str) -> str:
+    return text.replace("bluetooth не usb", "блютуз не юэсби").replace(
+        "mega silk way", "мега силк уэй"
+    )
 
 
-def convert_to_ascii(text):
-    return unidecode(text)
-
-
-def basic_cleaners(text):
-    text = lowercase(text)
-    text = collapse_whitespace(text)
-    return text
-
-
-def transliteration_cleaners(text):
-    text = convert_to_ascii(text)
-    text = lowercase(text)
-    text = collapse_whitespace(text)
-    return text
-
-def replace_english_words(text):
-    text = text.replace("bluetooth не usb", "блютуз не юэсби").replace("mega silk way", "мега силк уэй")
-    return text
-
-def kazakh_cleaners(text):
-#    text = convert_to_ascii(text)
-    text = lowercase(text)
-#    text = expand_numbers(text)
-    text = expand_abbreviations(text)
-    text = replace_english_words(text)
-    text = collapse_whitespace(text)
+def kazakh_cleaners(text: str) -> str:
+    text = text.lower()
+    text = _expand_abbreviations(text)
+    text = _replace_english_words(text)
+    text = _collapse_whitespace(text)
     return text.replace("c", "с").strip()

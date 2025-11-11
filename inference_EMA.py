@@ -1,19 +1,21 @@
 import json
-import numpy as np
-import torch
-from pydub import AudioSegment
 import re
-from num2words import num2words
-from text import convert_text
-from model import GradTTSWithEmo
-import utils_data as utils
-from attrdict import AttrDict
-from models import Generator as HiFiGAN
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
+import torch
+from attrdict import AttrDict
+from num2words import num2words
+from pydub import AudioSegment
+
+import utils_data as utils
+from model import GradTTSWithEmo
+from models import Generator as HiFiGAN
+from text import convert_text
 
 HIFIGAN_CONFIG = './configs/hifigan-config.json'
-HIFIGAN_CHECKPT = r'.\pre_trained\g_01720000'
+HIFIGAN_CHECKPT = r'.\\pre_trained\\g_01720000'
+
 
 if __name__ == '__main__':
     hps, args = utils.get_hparams_decode()
@@ -35,35 +37,52 @@ if __name__ == '__main__':
     emos = sorted(["angry", "surprise", "fear", "happy", "neutral", "sad"])
     speakers = ['M1', 'F1', 'M2']
 
+    entries = []
     with open(args.file, 'r', encoding='utf-8') as f:
-        texts = [line.strip() for line in f.readlines()]
+        for raw_line in f:
+            line = raw_line.strip()
+            if not line:
+                continue
+            parts = line.split('|')
+            if len(parts) != 3:
+                logger.warning("Skip line with unexpected format: %s", line)
+                continue
+            text, emo_idx, spk_idx = parts
+            try:
+                emo_id = int(emo_idx)
+                spk_id = int(spk_idx)
+            except ValueError:
+                logger.warning("Skip line with non-integer emotion/speaker ids: %s", line)
+                continue
+            if not 0 <= emo_id < len(emos):
+                logger.warning("Skip line with out-of-range emotion id: %s", line)
+                continue
+            if not 0 <= spk_id < len(speakers):
+                logger.warning("Skip line with out-of-range speaker id: %s", line)
+                continue
+            text = re.sub(r'(\d+)', lambda m: num2words(m.group(), lang='kz'), text)
+            entries.append((text, emo_id, spk_id))
 
-    replace_nums = []
-    for i in texts:
-        replace_nums.append(i.split('|', 1))
-
-    nums2word = [re.sub('(\d+)', lambda m: num2words(m.group(), lang='kz'), sentence) for sentence in np.array(replace_nums)[:, 0]]
-    text2speech = []
-    for i, j in zip(nums2word, np.array(replace_nums)[:, 1]):
-        text2speech.append(f'{i}|{j}')
-
-    for i, line in enumerate(text2speech):
-        emo_i = int(line.split('|')[1])
-        control_spk_id = int(line.split('|')[2])
-        control_emo_id = emos.index(emos[emo_i])
-        text = line.split('|')[0]
+    for text, emo_i, control_spk_id in entries:
+        control_emo_id = emo_i
         with torch.no_grad():
             ### define emotion
             emo = torch.LongTensor([control_emo_id]).to(device)
             sid = torch.LongTensor([control_spk_id]).to(device)
             text_padded, text_len = convert_text(text)
-            y_enc, y_dec, attn = model.forward(text_padded, text_len,
-                                        n_timesteps=args.timesteps,
-                                        temperature=args.noise,
-                                        stoc=args.stoc, spk=sid,emo=emo, length_scale=1.,
-                                        classifier_free_guidance=args.guidance)
+            y_enc, y_dec, attn = model.forward(
+                text_padded,
+                text_len,
+                n_timesteps=args.timesteps,
+                temperature=args.noise,
+                stoc=args.stoc,
+                spk=sid,
+                emo=emo,
+                length_scale=1.,
+                classifier_free_guidance=args.guidance,
+            )
         res = y_dec.squeeze().cpu().numpy()
-        x = torch.from_numpy(res).cuda().unsqueeze(0)
+        x = torch.from_numpy(res).unsqueeze(0).cuda()
         y_g_hat = vocoder(x)
         audio = y_g_hat.squeeze()
         audio = audio * 32768.0
@@ -73,7 +92,7 @@ if __name__ == '__main__':
         out_dir = Path(args.generated_path)
         out_dir.mkdir(parents=True, exist_ok=True)
 
-        spk = speakers[int(line.split("|")[2])]
+        spk = speakers[control_spk_id]
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
         fname = f"{emos[emo_i]}_{spk}_{ts}.mp3"
         audio.export(str(out_dir / fname), format="mp3", bitrate="192k")
