@@ -1,41 +1,50 @@
-"""Utility functions required for Grad-TTS inference."""
-
 import torch
 
 
 def sequence_mask(length, max_length=None):
-    """Return a mask with ones up to each sequence length."""
     if max_length is None:
         max_length = length.max()
-    positions = torch.arange(int(max_length), dtype=length.dtype, device=length.device)
-    return positions.unsqueeze(0) < length.unsqueeze(1)
+    x = torch.arange(max_length, dtype=length.dtype, device=length.device)
+    return x.unsqueeze(0) < length.unsqueeze(1)
 
 
 def fix_len_compatibility(length, num_downsamplings_in_unet=2):
-    """Pad a length so it is divisible by the UNet downsampling factor."""
-    while length % (2**num_downsamplings_in_unet):
+    while True:
+        if length % (2**num_downsamplings_in_unet) == 0:
+            return length
         length += 1
-    return length
 
 
 def convert_pad_shape(pad_shape):
-    """Convert a nested list pad description into torch.nn.functional.pad format."""
-    reversed_shape = pad_shape[::-1]
-    return [item for sublist in reversed_shape for item in sublist]
+    l = pad_shape[::-1]
+    pad_shape = [item for sublist in l for item in sublist]
+    return pad_shape
 
 
 def generate_path(duration, mask):
-    """Expand token durations into an alignment path constrained by ``mask``."""
+    """
+    Generates an alignment path from durations.
+    duration: [b, t_x]
+    mask: [b, 1, t_y, t_x]
+    """
     device = duration.device
-
-    batch, token_steps, mel_steps = mask.shape
-    cum_duration = torch.cumsum(duration, dim=1)
-    path = torch.zeros(batch, token_steps, mel_steps, dtype=mask.dtype, device=device)
-
-    flat_cum_duration = cum_duration.view(batch * token_steps)
-    path = sequence_mask(flat_cum_duration, mel_steps).to(mask.dtype)
-    path = path.view(batch, token_steps, mel_steps)
-    path = path - torch.nn.functional.pad(
-        path, convert_pad_shape([[0, 0], [1, 0], [0, 0]])
-    )[:, :-1]
-    return path * mask
+    b, _, t_y, t_x = mask.shape
+    
+    path = torch.zeros(b, t_y, t_x, dtype=mask.dtype).to(device)
+    duration_int = torch.round(duration).long()
+    
+    for i in range(b):
+        cum_duration = torch.cumsum(duration_int[i], -1)
+        
+        for j in range(t_x):
+            start_time = cum_duration[j-1] if j > 0 else 0
+            end_time = cum_duration[j]
+            
+            if start_time < end_time:
+                start = min(start_time, t_y)
+                end = min(end_time, t_y)
+                # The original code had the dimensions swapped.
+                # We need to align the text tokens (t_x) with the mel frames (t_y).
+                path[i, start:end, j] = 1
+                
+    return path

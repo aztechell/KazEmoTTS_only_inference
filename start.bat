@@ -1,1 +1,1 @@
-python inference_EMA.py -c .\configs\train_grad.json -m ".\pre_trained\EMA_grad_10000.pt" -g 100 -f .\filelists\inference_generated.txt -r .\generated
+python inference_EMA.py -c .\configs\train_grad.json -m ".\pre_trained\EMA_grad_10000.pt" -g 100 -f .\INPUT.txt -r .\generated

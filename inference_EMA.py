@@ -22,7 +22,6 @@ if __name__ == '__main__':
     device = torch.device('cpu' if not torch.cuda.is_available() else "cuda")
     ckpt = args.model
     model = GradTTSWithEmo(**hps.model).to(device)
-    logger = utils.get_logger(hps.model_dir, "inference.log")
     utils.load_checkpoint(ckpt, model, None)
     _ = model.cuda().eval()
 
@@ -45,20 +44,20 @@ if __name__ == '__main__':
                 continue
             parts = line.split('|')
             if len(parts) != 3:
-                logger.warning("Skip line with unexpected format: %s", line)
+                print(f"Skip line with unexpected format: {line}")
                 continue
             text, emo_idx, spk_idx = parts
             try:
                 emo_id = int(emo_idx)
                 spk_id = int(spk_idx)
             except ValueError:
-                logger.warning("Skip line with non-integer emotion/speaker ids: %s", line)
+                print(f"Skip line with non-integer emotion/speaker ids: {line}")
                 continue
             if not 0 <= emo_id < len(emos):
-                logger.warning("Skip line with out-of-range emotion id: %s", line)
+                print(f"Skip line with out-of-range emotion id: {line}")
                 continue
             if not 0 <= spk_id < len(speakers):
-                logger.warning("Skip line with out-of-range speaker id: %s", line)
+                print(f"Skip line with out-of-range speaker id: {line}")
                 continue
             text = re.sub(r'(\d+)', lambda m: num2words(m.group(), lang='kz'), text)
             entries.append((text, emo_id, spk_id))

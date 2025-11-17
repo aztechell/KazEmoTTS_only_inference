@@ -1,11 +1,7 @@
 """Minimal text processing helpers for KazEmoTTS inference."""
-
 from __future__ import annotations
-
 from typing import Iterable, Sequence
-
 import torch
-
 from text import cleaners
 from text.symbols import symbols
 
@@ -13,7 +9,6 @@ __all__ = [
     "convert_text",
     "text_to_sequence",
 ]
-
 
 _symbol_to_id = {s: i for i, s in enumerate(symbols)}
 _DEFAULT_CLEANERS: Sequence[str] = ("kazakh_cleaners",)

@@ -4,7 +4,7 @@ import torch.nn as nn
 from torch.nn import Conv1d, ConvTranspose1d
 from torch.nn.utils import weight_norm, remove_weight_norm
 
-from xutils import init_weights, get_padding
+from utils_data import init_weights, get_padding
 
 
 LRELU_SLOPE = 0.1

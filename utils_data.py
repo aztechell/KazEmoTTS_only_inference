@@ -1,14 +1,10 @@
 import argparse
 import json
-import logging
 import os
 from pathlib import Path
 from typing import Optional, Tuple
 
 import torch
-
-
-_LOGGER = logging.getLogger(__name__)
 
 
 class HParams:
@@ -43,34 +39,10 @@ class HParams:
         return repr(self.__dict__)
 
 
-def get_logger(model_dir: str, filename: str = "train.log") -> logging.Logger:
-    """Create a file logger scoped to the given model directory."""
-    path = Path(model_dir)
-    path.mkdir(parents=True, exist_ok=True)
-
-    logger = logging.getLogger(path.name)
-    logger.setLevel(logging.DEBUG)
-    logger.propagate = False
-
-    if not logger.handlers:
-        formatter = logging.Formatter(
-            "%(asctime)s\t%(name)s\t%(levelname)s\t%(message)s"
-        )
-        handler = logging.FileHandler(path / filename)
-        handler.setLevel(logging.DEBUG)
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-
-    global _LOGGER
-    _LOGGER = logger
-    return logger
-
-
 def load_checkpoint(
     checkpoint_path: str,
     model,
     optimizer=None,
-    logger: Optional[logging.Logger] = None,
 ) -> Tuple[object, Optional[object], Optional[float], Optional[int]]:
     """Load a model checkpoint saved during training."""
     if not os.path.isfile(checkpoint_path):
@@ -87,13 +59,10 @@ def load_checkpoint(
     target = model.module if hasattr(model, "module") else model
     target.load_state_dict(state_dict, strict=False)
 
-    active_logger = logger or _LOGGER or logging.getLogger(__name__)
     if iteration is not None:
-        active_logger.info(
-            "Loaded checkpoint '%s' (iteration %s)", checkpoint_path, iteration
-        )
+        print(f"Loaded checkpoint '{checkpoint_path}' (iteration {iteration})")
     else:
-        active_logger.info("Loaded checkpoint '%s'", checkpoint_path)
+        print(f"Loaded checkpoint '{checkpoint_path}'")
 
     return model, optimizer, learning_rate, iteration
 
@@ -112,7 +81,7 @@ def get_hparams_decode(model_dir: Optional[str] = None):
         "--model",
         type=str,
         default=model_dir,
-        help="Model name (used to resolve ./logs/<model>)",
+        help="Path to the model checkpoint file",
     )
     parser.add_argument("-s", "--seed", type=int, default=1234)
     parser.add_argument(
@@ -150,15 +119,22 @@ def get_hparams_decode(model_dir: Optional[str] = None):
     )
 
     args = parser.parse_args()
-    model_root = Path("./logs") / args.model if args.model else Path("./logs")
-    model_root.mkdir(parents=True, exist_ok=True)
 
     with open(args.config, "r", encoding="utf-8") as f:
         config = json.load(f)
 
     hparams = HParams(**config)
-    hparams.model_dir = str(model_root)
     if hasattr(hparams, "train"):
         hparams.train.seed = args.seed
 
     return hparams, args
+
+
+def init_weights(m, mean=0.0, std=0.01):
+    classname = m.__class__.__name__
+    if classname.find("Conv") != -1:
+        m.weight.data.normal_(mean, std)
+
+
+def get_padding(kernel_size, dilation=1):
+    return int((kernel_size*dilation - dilation)/2)
