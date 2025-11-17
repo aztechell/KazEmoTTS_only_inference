@@ -6,7 +6,7 @@
 
 1. Импортировать проект (Project from version control)   
 2. Создать виртуальную среду (желательно с 3.9.13)  
-3. Установить pytorch ``` pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu128 ```  
+3. Установить pytorch [https://pytorch.org/get-started/locally/](https://pytorch.org/get-started/locally/), например: ``` pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu128 ```  
 4. установить модули ``` python -m pip install -r requirements.txt ```
 5. скачать тренированную модель (чекпоинт) [https://issai.nu.edu.kz/wp-content/uploads/2024/03/pt_10000.zip](https://issai.nu.edu.kz/wp-content/uploads/2024/03/pt_10000.zip) и (https://issai.nu.edu.kz/wp-content/uploads/2024/03/pre_trained_hf.zip)   
 6. Загрузить скачанные файлы EMA_grad_10000.pt и g_01720000 в папку pre_trained   
